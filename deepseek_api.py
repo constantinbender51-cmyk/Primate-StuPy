@@ -84,6 +84,10 @@ class DeepSeekAPI:
             {{"operation": "write_at_line", "file": "hello.py", "line": 2, "content": "print('Second line')"}},
             {{"operation": "delete_at_line", "file": "hello.py", "line": 1, "content": "print('Hello World!')"}}
         ]
+
+        Railway may need language specific files to install dependencies, libraries or packages and to know what file to execute after deployment.
+        For python deployments you msy need a requirements.txt and a Procfile.
+        
         
         Only respond with valid JSON array.
         """
@@ -120,9 +124,6 @@ class DeepSeekAPI:
         DEPLOYMENT LOGS:
         {deployment_logs}
 
-        Railway may need language specific files to install dependencies, libraries or packages and to know what file to execute after deployment.
-        For python deployments you msy need a requirements.txt and a Procfile.
-        
         CURRENT CODEBASE:
         {codebase}
         
@@ -141,6 +142,9 @@ class DeepSeekAPI:
                 {{"operation": "delete_at_line", "file": "filename", "line": 10, "content": "lines\\nto\\ndelete"}}
             ]
         }}
+
+        Railway may need language specific files to install dependencies, libraries or packages and to know what file to execute after deployment.
+        For python deployments you msy need a requirements.txt and a Procfile.
         
         Only respond with valid JSON, no other text.
         """
