@@ -119,6 +119,9 @@ class DeepSeekAPI:
         
         DEPLOYMENT LOGS:
         {deployment_logs}
+
+        Railway may need language specific files to install dependencies, libraries or packages and to know what file to execute after deployment.
+        For python deployments you msy need a requirements.txt and a Procfile.
         
         CURRENT CODEBASE:
         {codebase}
