@@ -279,6 +279,11 @@ class GitHubAPI:
         results = self.upload_final_files(final_files)
         
         return results
+        
+    except Exception as e:
+        logger.error(f"❌ Error clearing repository: {str(e)}")
+        return False, [f"Error: {str(e)}"]
+
 
     def clear_repository(self):
         """Delete all files from the repository"""
@@ -317,7 +322,3 @@ class GitHubAPI:
         
             logger.info(f"✅ Repository cleared: {len(delete_results)} files processed")
             return True, delete_results
-        
-    except Exception as e:
-        logger.error(f"❌ Error clearing repository: {str(e)}")
-        return False, [f"Error: {str(e)}"]
