@@ -60,10 +60,10 @@ class GitHubAPI:
         except Exception as e:
             logger.error(f"❌ Failed to fetch codebase: {str(e)}")
             raise
-    
-    def get_file_content(self, filename: str) -> tuple:
+
+    def get_file_content_and_sha(self, filename: str) -> tuple:
         """Get current file content and SHA from GitHub"""
-        logger.debug(f"📖 Getting content for: {filename}")
+        logger.debug(f"📖 Getting content and SHA for: {filename}")
         url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{filename}"
         
         try:
@@ -82,178 +82,200 @@ class GitHubAPI:
         except Exception as e:
             logger.error(f"❌ Error getting file content for {filename}: {str(e)}")
             return None, None
-    
-    def apply_instruction(self, instruction: dict) -> bool:
-        """Apply a single file operation to GitHub"""
-        op = instruction['operation']
-        file = instruction['file']
+
+    def process_file_operations(self, instructions: list) -> dict:
+        """Process all file operations locally and return final file contents"""
+        logger.info(f"🔄 Processing {len(instructions)} operations locally...")
         
-        logger.info(f"🔧 Applying operation: {op} on {file}")
-        logger.debug(f"Full instruction: {instruction}")
+        # Group operations by file
+        file_operations = {}
+        for instruction in instructions:
+            file = instruction['file']
+            if file not in file_operations:
+                file_operations[file] = []
+            file_operations[file].append(instruction)
         
-        url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{file}"
-
-        try:
-            if op == 'write':
-                content = instruction['content']
-                logger.debug(f"Writing {len(content)} bytes to {file}")
-                
-                payload = {
-                    'message': f'Write {file}',
-                    'content': base64.b64encode(content.encode('utf-8')).decode('utf-8')
-                }
-                
-                response = requests.put(url, headers=self.headers, json=payload)
-                success = response.status_code in [200, 201]
-                
-                if success:
-                    logger.info(f"✅ Successfully wrote {file}")
-                else:
-                    logger.error(f"❌ Failed to write {file}: {response.status_code}")
-                    logger.debug(f"Response: {response.text[:200]}")
-                
-                return success
-
-            elif op == 'delete':
-                current_content, sha = self.get_file_content(file)
-                if not sha:
-                    logger.warning(f"⚠️  Cannot delete {file}: file not found")
-                    return False
-                
-                logger.debug(f"Deleting {file} with SHA: {sha[:8]}...")
-                payload = {
-                    'message': f'Delete {file}',
-                    'sha': sha
-                }
-                
-                response = requests.delete(url, headers=self.headers, json=payload)
-                success = response.status_code in [200, 204]
-                
-                if success:
-                    logger.info(f"✅ Successfully deleted {file}")
-                else:
-                    logger.error(f"❌ Failed to delete {file}: {response.status_code}")
-                
-                return success
-
-            elif op == 'insert':
-                line = instruction['line']
-                content_to_insert = instruction['content']
-                
-                logger.debug(f"Inserting content at line {line} in {file}")
-                current_content, sha = self.get_file_content(file)
-                
-                if current_content is None:
-                    logger.debug(f"File {file} doesn't exist, creating new file")
-                    payload = {
-                        'message': f'Create {file} with insert at line {line}',
-                        'content': base64.b64encode(content_to_insert.encode('utf-8')).decode('utf-8')
-                    }
-                    response = requests.put(url, headers=self.headers, json=payload)
-                    success = response.status_code in [200, 201]
-                    
-                    if success:
-                        logger.info(f"✅ Created {file} with inserted content")
-                    else:
-                        logger.error(f"❌ Failed to create {file}: {response.status_code}")
-                    
-                    return success
-                
-                lines = current_content.split('\n')
-                total_lines = len(lines)
-                logger.debug(f"Current file has {total_lines} lines")
-                
-                if line < 1 or line > total_lines + 1:
-                    logger.error(f"❌ Invalid line number {line} for file with {total_lines} lines")
-                    return False
-                
-                lines.insert(line - 1, content_to_insert)
-                new_content = '\n'.join(lines)
-                
-                payload = {
-                    'message': f'Insert at line {line} in {file}',
-                    'content': base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
-                    'sha': sha
-                }
-                
-                response = requests.put(url, headers=self.headers, json=payload)
-                success = response.status_code in [200, 201]
-                
-                if success:
-                    logger.info(f"✅ Successfully inserted content at line {line} in {file}")
-                else:
-                    logger.error(f"❌ Failed to insert in {file}: {response.status_code}")
-                
-                return success
-
-            elif op == 'delete_from':
-                line = instruction['line']
-                content_to_delete = instruction['content']
-                
-                logger.debug(f"Deleting content from line {line} in {file}")
-                current_content, sha = self.get_file_content(file)
-                
-                if not current_content:
-                    logger.warning(f"⚠️  Cannot delete from {file}: file not found")
-                    return False
-                
-                lines = current_content.split('\n')
-                if line < 1 or line > len(lines):
-                    logger.error(f"❌ Invalid line number {line} for file with {len(lines)} lines")
-                    return False
-                
-                target_line_content = lines[line - 1] if line - 1 < len(lines) else ""
-                
-                if content_to_delete in target_line_content:
-                    logger.debug(f"Found matching content at line {line}, deleting...")
-                    del lines[line - 1]
-                    new_content = '\n'.join(lines)
-                    
-                    payload = {
-                        'message': f'Delete content from line {line} in {file}',
-                        'content': base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
-                        'sha': sha
-                    }
-                    
-                    response = requests.put(url, headers=self.headers, json=payload)
-                    success = response.status_code in [200, 201]
-                    
-                    if success:
-                        logger.info(f"✅ Successfully deleted line {line} from {file}")
-                    else:
-                        logger.error(f"❌ Failed to delete from {file}: {response.status_code}")
-                    
-                    return success
-                else:
-                    logger.warning(f"⚠️  Content '{content_to_delete}' not found at line {line}")
-                    return False
+        final_files = {}
+        
+        for file, operations in file_operations.items():
+            logger.info(f"📄 Processing file: {file} ({len(operations)} operations)")
             
+            # Get current file content from GitHub
+            current_content, sha = self.get_file_content_and_sha(file)
+            if current_content is None:
+                current_content = ""  # New file
+                logger.debug(f"  Creating new file: {file}")
             else:
-                logger.error(f"❌ Unknown operation: {op}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"❌ Exception during {op} on {file}: {str(e)}")
-            return False
-    
-    def apply_instructions(self, instructions: list) -> list:
-        """Apply all instructions to GitHub and return results"""
-        logger.info(f"📦 Applying {len(instructions)} instructions to GitHub...")
+                logger.debug(f"  Loaded existing file: {file} ({len(current_content)} bytes)")
+            
+            # Apply operations in correct order
+            final_content = self._apply_operations_to_file(file, current_content, operations)
+            final_files[file] = {
+                'content': final_content,
+                'sha': sha,  # Will be None for new files
+                'operations': operations
+            }
+            
+            logger.info(f"  ✅ Processed {file}: {len(current_content)} → {len(final_content)} bytes")
+        
+        return final_files
+
+    def _apply_operations_to_file(self, filename: str, content: str, operations: list) -> str:
+        """Apply all operations to a file content and return final version"""
+        lines = content.split('\n') if content else []
+        
+        # Separate operation types
+        write_ops = [op for op in operations if op['operation'] == 'write']
+        delete_ops = [op for op in operations if op['operation'] == 'delete']
+        write_at_line_ops = [op for op in operations if op['operation'] == 'write_at_line']
+        delete_at_line_ops = [op for op in operations if op['operation'] == 'delete_at_line']
+        
+        # Apply operations in correct order
+        
+        # 1. Handle write operations (complete file overwrite)
+        if write_ops:
+            if len(write_ops) > 1:
+                logger.warning(f"⚠️  Multiple write operations for {filename}, using the last one")
+            final_op = write_ops[-1]
+            logger.debug(f"  Applying write operation to {filename}")
+            return final_op['content']
+        
+        # 2. Handle delete operations
+        if delete_ops:
+            logger.debug(f"  Applying delete operation to {filename}")
+            return ""  # File deleted
+        
+        # 3. Apply line-level operations from bottom to top to avoid shifting
+        all_line_ops = write_at_line_ops + delete_at_line_ops
+        
+        # Sort by line number descending (process from bottom up)
+        all_line_ops.sort(key=lambda x: x.get('line', 0), reverse=True)
+        
+        for operation in all_line_ops:
+            op_type = operation['operation']
+            line_num = operation['line']
+            op_content = operation['content']
+            
+            if op_type == 'write_at_line':
+                lines = self._apply_write_at_line(lines, line_num, op_content, filename)
+            elif op_type == 'delete_at_line':
+                lines = self._apply_delete_at_line(lines, line_num, op_content, filename)
+        
+        return '\n'.join(lines)
+
+    def _apply_write_at_line(self, lines: list, line_num: int, content: str, filename: str) -> list:
+        """Insert content at specific line number"""
+        logger.debug(f"    Inserting at line {line_num} in {filename}")
+        
+        if line_num < 1 or line_num > len(lines) + 1:
+            logger.error(f"    ❌ Invalid line number {line_num} for file with {len(lines)} lines")
+            return lines
+        
+        # Split content into lines to insert
+        content_lines = content.split('\n')
+        
+        # Insert the content
+        lines[line_num-1:line_num-1] = content_lines
+        logger.debug(f"    ✅ Inserted {len(content_lines)} lines at line {line_num}")
+        
+        return lines
+
+    def _apply_delete_at_line(self, lines: list, line_num: int, content: str, filename: str) -> list:
+        """Delete specific consecutive lines where content matches exactly"""
+        logger.debug(f"    Checking deletion at line {line_num} in {filename}")
+        
+        if line_num < 1 or line_num > len(lines):
+            logger.error(f"    ❌ Invalid line number {line_num} for file with {len(lines)} lines")
+            return lines
+        
+        # Calculate the range to check (content might span multiple lines)
+        content_lines = content.split('\n')
+        end_line = line_num - 1 + len(content_lines)
+        
+        if end_line > len(lines):
+            logger.error(f"    ❌ Delete range {line_num}-{end_line} exceeds file length {len(lines)}")
+            return lines
+        
+        # Check if content matches exactly
+        actual_content = '\n'.join(lines[line_num-1:end_line])
+        if actual_content == content:
+            # Delete the matching lines
+            del lines[line_num-1:end_line]
+            logger.debug(f"    ✅ Deleted {len(content_lines)} lines starting at line {line_num}")
+        else:
+            logger.warning(f"    ⚠️  Content mismatch at line {line_num}, skipping deletion")
+            logger.debug(f"      Expected: {content[:100]}...")
+            logger.debug(f"      Actual: {actual_content[:100]}...")
+        
+        return lines
+
+    def upload_final_files(self, final_files: dict) -> list:
+        """Upload final processed files to GitHub"""
+        logger.info(f"📤 Uploading {len(final_files)} files to GitHub...")
         
         results = []
-        for i, instruction in enumerate(instructions, 1):
-            logger.debug(f"Processing instruction {i}/{len(instructions)}")
+        
+        for filename, file_data in final_files.items():
+            content = file_data['content']
+            sha = file_data['sha']
+            operations = file_data['operations']
             
-            success = self.apply_instruction(instruction)
-            op = instruction['operation']
-            file = instruction['file']
+            url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{filename}"
+            
+            # Determine if this is create, update, or delete
+            if content == "":  # File deletion
+                if sha:  # Only delete if file exists
+                    payload = {
+                        'message': f'Delete {filename}',
+                        'sha': sha
+                    }
+                    response = requests.delete(url, headers=self.headers, json=payload)
+                    success = response.status_code in [200, 204]
+                    op_desc = "delete"
+                else:
+                    logger.warning(f"⚠️  Cannot delete non-existent file: {filename}")
+                    success = False
+                    op_desc = "delete (skip)"
+            else:  # File create or update
+                payload = {
+                    'message': f'Update {filename}',
+                    'content': base64.b64encode(content.encode('utf-8')).decode('utf-8')
+                }
+                if sha:  # Update existing file
+                    payload['sha'] = sha
+                    op_desc = "update"
+                else:  # Create new file
+                    op_desc = "create"
+                
+                response = requests.put(url, headers=self.headers, json=payload)
+                success = response.status_code in [200, 201]
             
             if success:
-                results.append(f"✅ {op} {file}")
+                results.append(f"✅ {op_desc} {filename}")
+                logger.info(f"  ✅ {op_desc} {filename}")
             else:
-                results.append(f"❌ {op} {file}")
+                results.append(f"❌ {op_desc} {filename}")
+                logger.error(f"  ❌ Failed to {op_desc} {filename}: {response.status_code if 'response' in locals() else 'N/A'}")
+                if 'response' in locals():
+                    logger.debug(f"    Response: {response.text[:200]}")
         
         success_count = sum(1 for r in results if r.startswith('✅'))
-        logger.info(f"📊 Results: {success_count}/{len(instructions)} operations successful")
+        logger.info(f"📊 Upload results: {success_count}/{len(final_files)} files successful")
+        
+        return results
+
+    def apply_instructions(self, instructions: list) -> list:
+        """Main method: process all instructions and upload to GitHub"""
+        logger.info(f"🚀 Applying {len(instructions)} instructions...")
+        
+        if not instructions:
+            logger.warning("⚠️  No instructions to apply")
+            return ["⚠️  No operations to apply"]
+        
+        # Process all operations locally
+        final_files = self.process_file_operations(instructions)
+        
+        # Upload final files to GitHub
+        results = self.upload_final_files(final_files)
         
         return results
