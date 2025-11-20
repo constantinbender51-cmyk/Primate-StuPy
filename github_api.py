@@ -280,43 +280,43 @@ class GitHubAPI:
         
         return results
 
-        def clear_repository(self):
-            """Delete all files from the repository"""
-            logger.info("🗑️ Clearing entire repository...")
+    def clear_repository(self):
+        """Delete all files from the repository"""
+        logger.info("🗑️ Clearing entire repository...")
     
-            try:
-                # Get all files in the repository
-                url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/"
-                response = requests.get(url, headers=self.headers)
+        try:
+            # Get all files in the repository
+            url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/"
+            response = requests.get(url, headers=self.headers)
         
-                if response.status_code != 200:
-                    logger.error(f"❌ Failed to list repository contents: {response.status_code}")
-                    return False
+            if response.status_code != 200:                    
+                logger.error(f"❌ Failed to list repository contents: {response.status_code}")
+                return False
         
-                items = response.json()
-                delete_results = []
+            items = response.json()
+            delete_results = []
         
-                for item in items:
-                    if item['type'] == 'file':
-                        logger.debug(f"🗑️ Deleting file: {item['path']}")
+            for item in items:
+                if item['type'] == 'file':
+                    logger.debug(f"🗑️ Deleting file: {item['path']}")
                 
-                        delete_url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{item['path']}"
-                        delete_payload = {
-                            'message': f'Clear repository: delete {item["path"]}',
-                            'sha': item['sha']
-                        }
+                    delete_url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{item['path']}"
+                    delete_payload = {
+                        'message': f'Clear repository: delete {item["path"]}',
+                        'sha': item['sha']
+                    }
                 
-                        delete_response = requests.delete(delete_url, headers=self.headers, json=delete_payload)
+                    delete_response = requests.delete(delete_url, headers=self.headers, json=delete_payload)
                 
-                        if delete_response.status_code in [200, 204]:
-                            delete_results.append(f"✅ Deleted {item['path']}")
-                            logger.info(f"✅ Deleted {item['path']}")
-                        else:
-                            delete_results.append(f"❌ Failed to delete {item['path']}: {delete_response.status_code}")
-                            logger.error(f"❌ Failed to delete {item['path']}: {delete_response.status_code}")
+                    if delete_response.status_code in [200, 204]:
+                        delete_results.append(f"✅ Deleted {item['path']}")
+                        logger.info(f"✅ Deleted {item['path']}")
+                    else:
+                        delete_results.append(f"❌ Failed to delete {item['path']}: {delete_response.status_code}")
+                        logger.error(f"❌ Failed to delete {item['path']}: {delete_response.status_code}")
         
-                logger.info(f"✅ Repository cleared: {len(delete_results)} files processed")
-                return True, delete_results
+            logger.info(f"✅ Repository cleared: {len(delete_results)} files processed")
+            return True, delete_results
         
     except Exception as e:
         logger.error(f"❌ Error clearing repository: {str(e)}")
