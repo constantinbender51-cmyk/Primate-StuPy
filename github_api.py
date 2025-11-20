@@ -279,46 +279,130 @@ class GitHubAPI:
         results = self.upload_final_files(final_files)
         
         return results
-        
-    except Exception as e:
-        logger.error(f"❌ Error clearing repository: {str(e)}")
-        return False, [f"Error: {str(e)}"]
-
 
     def clear_repository(self):
         """Delete all files from the repository"""
         logger.info("🗑️ Clearing entire repository...")
-    
+        
         try:
             # Get all files in the repository
             url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/"
             response = requests.get(url, headers=self.headers)
-        
-            if response.status_code != 200:                    
+            
+            if response.status_code != 200:
                 logger.error(f"❌ Failed to list repository contents: {response.status_code}")
-                return False
-        
+                return False, [f"Failed to list repository contents: {response.status_code}"]
+            
             items = response.json()
             delete_results = []
-        
+            
             for item in items:
                 if item['type'] == 'file':
                     logger.debug(f"🗑️ Deleting file: {item['path']}")
-                
+                    
                     delete_url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{item['path']}"
                     delete_payload = {
                         'message': f'Clear repository: delete {item["path"]}',
                         'sha': item['sha']
                     }
-                
+                    
                     delete_response = requests.delete(delete_url, headers=self.headers, json=delete_payload)
-                
+                    
                     if delete_response.status_code in [200, 204]:
                         delete_results.append(f"✅ Deleted {item['path']}")
                         logger.info(f"✅ Deleted {item['path']}")
                     else:
                         delete_results.append(f"❌ Failed to delete {item['path']}: {delete_response.status_code}")
                         logger.error(f"❌ Failed to delete {item['path']}: {delete_response.status_code}")
-        
+            
             logger.info(f"✅ Repository cleared: {len(delete_results)} files processed")
             return True, delete_results
+            
+        except Exception as e:
+            logger.error(f"❌ Error clearing repository: {str(e)}")
+            return False, [f"Error: {str(e)}"]
+
+    def get_repository_info(self):
+        """Get basic repository information"""
+        logger.debug("📊 Getting repository information...")
+        url = f"{self.api_url}/repos/{self.username}/{self.repo}"
+        
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                repo_data = response.json()
+                return {
+                    'name': repo_data['name'],
+                    'full_name': repo_data['full_name'],
+                    'description': repo_data.get('description', ''),
+                    'html_url': repo_data['html_url'],
+                    'default_branch': repo_data['default_branch'],
+                    'size': repo_data['size'],
+                    'updated_at': repo_data['updated_at']
+                }
+            else:
+                logger.error(f"❌ Failed to get repository info: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"❌ Error getting repository info: {str(e)}")
+            return None
+
+    def list_files(self, path: str = ""):
+        """List files and directories in the repository"""
+        logger.debug(f"📁 Listing files in: {path or 'root'}")
+        url = f"{self.api_url}/repos/{self.username}/{self.repo}/contents/{path}"
+        
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                items = response.json()
+                files = []
+                directories = []
+                
+                for item in items:
+                    if item['type'] == 'file':
+                        files.append({
+                            'name': item['name'],
+                            'path': item['path'],
+                            'size': item['size'],
+                            'sha': item['sha']
+                        })
+                    elif item['type'] == 'dir':
+                        directories.append({
+                            'name': item['name'],
+                            'path': item['path']
+                        })
+                
+                return {
+                    'files': files,
+                    'directories': directories
+                }
+            else:
+                logger.error(f"❌ Failed to list files: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"❌ Error listing files: {str(e)}")
+            return None
+
+    def get_file_history(self, filename: str):
+        """Get commit history for a specific file"""
+        logger.debug(f"📜 Getting file history for: {filename}")
+        url = f"{self.api_url}/repos/{self.username}/{self.repo}/commits"
+        params = {'path': filename}
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            if response.status_code == 200:
+                commits = response.json()
+                return [{
+                    'sha': commit['sha'],
+                    'message': commit['commit']['message'],
+                    'author': commit['commit']['author']['name'],
+                    'date': commit['commit']['author']['date']
+                } for commit in commits]
+            else:
+                logger.error(f"❌ Failed to get file history: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"❌ Error getting file history: {str(e)}")
+            return None
