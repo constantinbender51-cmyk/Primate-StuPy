@@ -30,19 +30,41 @@ class RailwayAPI:
         """ % self.project_id
 
         response = requests.post(self.api_url, json={"query": query}, headers=self.headers)
+        
+        # Check if request was successful
+        if response.status_code != 200:
+            print(f"❌ Railway API request failed: {response.status_code}")
+            return None
+            
         data = response.json()
         
-        if 'data' in data and data['data']['deployments']['edges']:
-            deployment = data['data']['deployments']['edges'][0]['node']
-            return {
-                'id': deployment['id'],
-                'status': deployment['status'],
-                'createdAt': deployment['createdAt']
-            }
-        return None
+        # Check if data structure is valid and has deployments
+        if ('data' not in data or 
+            'deployments' not in data['data'] or 
+            'edges' not in data['data']['deployments']):
+            print("❌ Invalid response structure from Railway API")
+            return None
+        
+        edges = data['data']['deployments']['edges']
+        
+        # Check if there are any deployments
+        if not edges or len(edges) == 0:
+            print("📭 No deployments found for this project")
+            return None
+        
+        # Safe access to deployment data
+        deployment = edges[0]['node']
+        return {
+            'id': deployment['id'],
+            'status': deployment['status'],
+            'createdAt': deployment['createdAt']
+        }
     
     def get_deployment_logs(self, deployment_id: str) -> str:
         """Get deployment logs for a specific deployment"""
+        if not deployment_id:
+            return "No deployment ID provided"
+            
         query = """
         {
           deploymentLogs(deploymentId: "%s", limit: 500) {
@@ -54,9 +76,13 @@ class RailwayAPI:
         """ % deployment_id
 
         response = requests.post(self.api_url, json={"query": query}, headers=self.headers)
+        
+        if response.status_code != 200:
+            return f"Failed to fetch deployment logs: {response.status_code}"
+            
         data = response.json()
         
-        if 'data' in data:
+        if 'data' in data and data['data']['deploymentLogs']:
             logs = data['data']['deploymentLogs']
             formatted_logs = []
             for log in sorted(logs, key=lambda x: x["timestamp"]):
@@ -66,6 +92,9 @@ class RailwayAPI:
     
     def get_build_logs(self, deployment_id: str) -> str:
         """Get build logs for a specific deployment"""
+        if not deployment_id:
+            return "No deployment ID provided"
+            
         query = """
         {
           buildLogs(deploymentId: "%s", limit: 500) {
@@ -77,9 +106,13 @@ class RailwayAPI:
         """ % deployment_id
 
         response = requests.post(self.api_url, json={"query": query}, headers=self.headers)
+        
+        if response.status_code != 200:
+            return f"Failed to fetch build logs: {response.status_code}"
+            
         data = response.json()
         
-        if 'data' in data:
+        if 'data' in data and data['data']['buildLogs']:
             logs = data['data']['buildLogs']
             formatted_logs = []
             for log in sorted(logs, key=lambda x: x["timestamp"]):
@@ -93,13 +126,30 @@ class RailwayAPI:
             timeout = Config.MAX_DEPLOYMENT_WAIT
         
         start_time = time.time()
+        
+        print("🚀 Checking for deployments...")
         last_deployment = self.get_latest_deployment()
         
         if not last_deployment:
-            return None
+            print("📭 No existing deployments found. Waiting for first deployment...")
+            # Wait for initial deployment to appear
+            while time.time() - start_time < timeout:
+                current_deployment = self.get_latest_deployment()
+                if current_deployment:
+                    print(f"🎯 Found new deployment: {current_deployment['id']}")
+                    last_deployment = current_deployment
+                    break
+                time.sleep(Config.DEPLOYMENT_CHECK_INTERVAL)
+            
+            if not last_deployment:
+                return {
+                    'status': 'TIMEOUT',
+                    'deployment_logs': 'No deployment started within timeout period',
+                    'build_logs': 'No build logs available'
+                }
         
-        print(f"🚀 Monitoring deployment: {last_deployment['id']}")
-        print(f"📊 Initial status: {last_deployment['status']}")
+        print(f"📊 Monitoring deployment: {last_deployment['id']}")
+        print(f"📈 Initial status: {last_deployment['status']}")
         
         while time.time() - start_time < timeout:
             current_deployment = self.get_latest_deployment()
@@ -124,4 +174,8 @@ class RailwayAPI:
             time.sleep(Config.DEPLOYMENT_CHECK_INTERVAL)
         
         print("⏰ Deployment monitoring timeout reached")
-        return None
+        return {
+            'status': 'TIMEOUT',
+            'deployment_logs': 'Deployment monitoring timeout',
+            'build_logs': 'No build logs available'
+        }
