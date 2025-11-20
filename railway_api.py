@@ -6,7 +6,7 @@ from config import Config
 class RailwayAPI:
     def __init__(self):
         self.api_token = Config.RAILWAY_API_TOKEN
-        self.project_id = Config.RAILWAY_PROJECT_ID
+        self.project_id = Config.RAILWAY_TARGET_PROJECT_ID
         self.api_url = Config.RAILWAY_API_URL
         self.headers = {
             "Authorization": f"Bearer {self.api_token}",
