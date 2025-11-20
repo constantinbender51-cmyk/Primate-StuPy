@@ -13,9 +13,9 @@ class Config:
     GITHUB_REPO = os.getenv('GITHUB_REPO')
     GITHUB_API_URL = "https://api.github.com"
     
-    # Railway API
+    # Railway API - for the TARGET project
     RAILWAY_API_TOKEN = os.getenv('RAILWAY_API_TOKEN')
-    RAILWAY_TARGET_PROJECT_ID = os.getenv('RAILWAY_TARGET_PROJECT_ID')
+    RAILWAY_TARGET_PROJECT_ID = os.getenv('RAILWAY_TARGET_PROJECT_ID')  # Clearer name
     RAILWAY_API_URL = "https://backboard.railway.app/graphql/v2"
     
     # Deployment monitoring
@@ -32,7 +32,7 @@ class Config:
             'GITHUB_USERNAME': cls.GITHUB_USERNAME,
             'GITHUB_REPO': cls.GITHUB_REPO,
             'RAILWAY_API_TOKEN': cls.RAILWAY_API_TOKEN,
-            'RAILWAY_PROJECT_ID': cls.RAILWAY_PROJECT_ID
+            'RAILWAY_TARGET_PROJECT_ID': cls.RAILWAY_TARGET_PROJECT_ID  # Updated name
         }
         
         missing = [var for var, value in required_vars.items() if not value]
