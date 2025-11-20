@@ -19,12 +19,12 @@ class RailwayAPI:
         logger.debug(f"API URL: {self.api_url}")
     
     def get_latest_deployment(self) -> dict:
-        """Get the latest deployment for the project"""
+        """Get the latest deployment for the project using proper GraphQL variables"""
         logger.debug("🔍 Fetching latest deployment...")
         
         query = """
-        {
-          deployments(input: {projectId: "%s"}, first: 1) {
+        query GetDeployments($projectId: String!) {
+          deployments(input: {projectId: $projectId}, first: 1) {
             edges {
               node {
                 id
@@ -34,10 +34,18 @@ class RailwayAPI:
             }
           }
         }
-        """ % self.project_id
+        """
+        
+        variables = {
+            "projectId": self.project_id
+        }
 
         try:
-            response = requests.post(self.api_url, json={"query": query}, headers=self.headers)
+            response = requests.post(
+                self.api_url, 
+                json={"query": query, "variables": variables}, 
+                headers=self.headers
+            )
             
             logger.debug(f"Railway API response status: {response.status_code}")
             
@@ -90,25 +98,34 @@ class RailwayAPI:
             return None
     
     def get_deployment_logs(self, deployment_id: str) -> str:
-        """Get deployment logs for a specific deployment"""
+        """Get deployment logs for a specific deployment using proper GraphQL variables"""
         if not deployment_id:
             logger.warning("⚠️  No deployment ID provided for logs")
             return "No deployment ID provided"
         
         logger.debug(f"📜 Fetching deployment logs for: {deployment_id[:12]}...")
-            
+        
         query = """
-        {
-          deploymentLogs(deploymentId: "%s", limit: 500) {
+        query GetDeploymentLogs($deploymentId: String!, $limit: Int) {
+          deploymentLogs(deploymentId: $deploymentId, limit: $limit) {
             message
             severity
             timestamp
           }
         }
-        """ % deployment_id
+        """
+        
+        variables = {
+            "deploymentId": deployment_id,
+            "limit": 500
+        }
 
         try:
-            response = requests.post(self.api_url, json={"query": query}, headers=self.headers)
+            response = requests.post(
+                self.api_url, 
+                json={"query": query, "variables": variables}, 
+                headers=self.headers
+            )
             
             if response.status_code != 200:
                 error_msg = f"Failed to fetch deployment logs: {response.status_code}"
@@ -139,25 +156,34 @@ class RailwayAPI:
             return f"Error: {str(e)}"
     
     def get_build_logs(self, deployment_id: str) -> str:
-        """Get build logs for a specific deployment"""
+        """Get build logs for a specific deployment using proper GraphQL variables"""
         if not deployment_id:
             logger.warning("⚠️  No deployment ID provided for build logs")
             return "No deployment ID provided"
         
         logger.debug(f"🔨 Fetching build logs for: {deployment_id[:12]}...")
-            
+        
         query = """
-        {
-          buildLogs(deploymentId: "%s", limit: 500) {
+        query GetBuildLogs($deploymentId: String!, $limit: Int) {
+          buildLogs(deploymentId: $deploymentId, limit: $limit) {
             message
             severity
             timestamp
           }
         }
-        """ % deployment_id
+        """
+        
+        variables = {
+            "deploymentId": deployment_id,
+            "limit": 500
+        }
 
         try:
-            response = requests.post(self.api_url, json={"query": query}, headers=self.headers)
+            response = requests.post(
+                self.api_url, 
+                json={"query": query, "variables": variables}, 
+                headers=self.headers
+            )
             
             if response.status_code != 200:
                 error_msg = f"Failed to fetch build logs: {response.status_code}"
