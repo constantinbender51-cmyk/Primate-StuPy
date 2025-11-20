@@ -73,14 +73,16 @@ class DeepSeekAPI:
         Implement this instruction by providing file operations in JSON format:
         
         Available operations:
-        - write: Create or overwrite file
-        - delete: Delete file  
-        - insert: Insert at line
-        - delete_from: Delete content from line
+        - write: Create or overwrite entire file
+        - write_at_line: Insert content at specific line number
+        - delete: Delete entire file  
+        - delete_at_line: Delete specific consecutive lines where content exactly matches
         
         Return JSON array of operations. Example:
         [
-            {{"operation": "write", "file": "hello.py", "content": "print('Hello World!')"}}
+            {{"operation": "write", "file": "hello.py", "content": "print('Hello World!')"}},
+            {{"operation": "write_at_line", "file": "hello.py", "line": 2, "content": "print('Second line')"}},
+            {{"operation": "delete_at_line", "file": "hello.py", "line": 1, "content": "print('Hello World!')"}}
         ]
         
         Only respond with valid JSON array.
@@ -132,7 +134,8 @@ class DeepSeekAPI:
             "reason": "Explanation of what needs fixing",
             "instructions": [
                 {{"operation": "write", "file": "filename", "content": "content"}},
-                {{"operation": "insert", "file": "filename", "line": 5, "content": "code"}}
+                {{"operation": "write_at_line", "file": "filename", "line": 5, "content": "code"}},
+                {{"operation": "delete_at_line", "file": "filename", "line": 10, "content": "lines\\nto\\ndelete"}}
             ]
         }}
         
