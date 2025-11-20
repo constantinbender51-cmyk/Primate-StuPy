@@ -15,7 +15,7 @@ class Config:
     
     # Railway API
     RAILWAY_API_TOKEN = os.getenv('RAILWAY_API_TOKEN')
-    RAILWAY_PROJECT_ID = os.getenv('RAILWAY_PROJECT_ID')
+    RAILWAY_TARGET_PROJECT_ID = os.getenv('RAILWAY_TARGET_PROJECT_ID')
     RAILWAY_API_URL = "https://backboard.railway.app/graphql/v2"
     
     # Deployment monitoring
